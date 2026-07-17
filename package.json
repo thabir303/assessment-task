@@ -1,0 +1,37 @@
+{
+  "name": "agentic-institute-daytona-pi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Incremental systems-design assessment: Pi inside one Daytona VM per Convex-backed thread.",
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": ">=22.18.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "sandbox/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@agentic/web",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "check:structure": "node scripts/validateHarness.mjs",
+    "test:daytona": "node scripts/requireExternalConfig.mjs test:daytona",
+    "test:e2e": "node scripts/requireExternalConfig.mjs test:e2e",
+    "benchmark:provisioning": "node scripts/requireExternalConfig.mjs benchmark:provisioning"
+  },
+  "dependencies": {
+    "@daytona/sdk": "0.198.0",
+    "convex": "1.42.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.0",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vitest": "4.0.16"
+  }
+}

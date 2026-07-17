@@ -1,0 +1,392 @@
+[
+  {
+    "id": "project-harness-structural-smoke",
+    "priority": 1,
+    "phase": "phase-0-harness-and-contracts",
+    "category": "documentation",
+    "description": "The repository provides a repeatable initialization and structural smoke check for future implementation sessions.",
+    "acceptanceSteps": [
+      "Run ./init.sh in a clean checkout with Node.js and npm installed.",
+      "Confirm npm run check:structure exits successfully and reports the required harness artifacts.",
+      "Confirm the command does not provision a Daytona resource."
+    ],
+    "passes": true,
+    "evidence": "2026-07-17: In a clean temporary copy without .git, node_modules, or .env, ./init.sh installed the locked dependencies and npm run check:structure reported 14 required files and 28 features. A fake daytona executable placed first on PATH was not invoked while ./init.sh completed successfully."
+  },
+  {
+    "id": "shared-runner-event-contract",
+    "priority": 1,
+    "phase": "phase-0-harness-and-contracts",
+    "category": "architecture",
+    "description": "Control-plane and runner code share a validated, bounded normalized event contract.",
+    "acceptanceSteps": [
+      "Compile the contracts package.",
+      "Run contract tests for valid text, tool, lifecycle, and error events.",
+      "Run contract tests proving malformed or oversized records are rejected."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "convex-thread-lifecycle-schema",
+    "priority": 1,
+    "phase": "phase-1-convex-schema-and-local-frontend-shell",
+    "category": "architecture",
+    "description": "Convex stores typed thread, sandbox session, message, run, and tool-execution records with required indexes and state transitions.",
+    "acceptanceSteps": [
+      "Deploy or test the Convex schema successfully.",
+      "Verify indexes exist for messages by thread/sequence, tool executions by run/sequence, runs by thread/creation time, sandbox sessions by thread, and clientRequestId idempotency.",
+      "Verify invalid lifecycle transitions are rejected."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "minimal-reactive-chat-shell",
+    "priority": 2,
+    "phase": "phase-1-convex-schema-and-local-frontend-shell",
+    "category": "functional",
+    "description": "A responsive accessible Next.js chat shell displays a thread list, thread state, message list, and disabled/enabled composer from reactive Convex data.",
+    "acceptanceSteps": [
+      "Start npm run dev and open the application.",
+      "Verify the thread list, New conversation control, message area, and composer render at desktop and tablet widths.",
+      "Verify keyboard focus reaches interactive controls and the composer is disabled for non-accepting states."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "thread-creation-idempotency",
+    "priority": 1,
+    "phase": "phase-1-convex-schema-and-local-frontend-shell",
+    "category": "integration",
+    "description": "Creating a conversation records one thread and one provisioning intent per client request ID.",
+    "acceptanceSteps": [
+      "Call thread creation twice with the same clientRequestId.",
+      "Verify one thread and one provisioning request are stored.",
+      "Call with a new clientRequestId and verify a new thread is stored."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "daytona-vm-provisioning",
+    "priority": 1,
+    "phase": "phase-2-daytona-provisioning",
+    "category": "integration",
+    "description": "Creating a conversation provisions one private Daytona VM-compatible sandbox from the configured prebuilt snapshot.",
+    "acceptanceSteps": [
+      "Configure a Daytona target and pi-agent-v1 VM-compatible snapshot.",
+      "Create a thread and verify the provisioning action creates a private Daytona sandbox from that snapshot.",
+      "Record the sandbox ID, target, snapshot, and provisioning duration in Convex."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "distinct-daytona-sandbox-per-thread",
+    "priority": 1,
+    "phase": "phase-2-daytona-provisioning",
+    "category": "architecture",
+    "description": "Two conversations receive different Daytona sandbox IDs.",
+    "acceptanceSteps": [
+      "Create two threads with different client request IDs.",
+      "Wait until both are ready.",
+      "Verify the two sandbox session records contain non-empty, unequal Daytona sandbox IDs."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "prebuilt-snapshot-provisioning",
+    "priority": 1,
+    "phase": "phase-2-daytona-provisioning",
+    "category": "performance",
+    "description": "Conversation provisioning uses a prepared Daytona snapshot and never installs runner dependencies from scratch per thread.",
+    "acceptanceSteps": [
+      "Build or validate the configured pi-agent-v1 snapshot contains the runner and pinned dependencies.",
+      "Provision a thread and inspect runner startup logs for absence of per-thread dependency installation.",
+      "Record the snapshot identifier with provisioning evidence."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "pi-agent-inside-daytona-vm",
+    "priority": 1,
+    "phase": "phase-3-pi-runner-inside-the-vm",
+    "category": "architecture",
+    "description": "The Pi Agent process itself runs inside the Daytona VM mapped to its conversation.",
+    "acceptanceSteps": [
+      "Create a ready thread and submit a runner health or diagnostic turn.",
+      "Verify process/cwd evidence identifies the Pi runner inside the mapped Daytona sandbox.",
+      "Verify no host-side Pi process performs the agent turn."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "persistent-pi-agent-session",
+    "priority": 1,
+    "phase": "phase-3-pi-runner-inside-the-vm",
+    "category": "integration",
+    "description": "Each runner owns a persistent Pi AgentSession and session files in its VM.",
+    "acceptanceSteps": [
+      "Send two ordered turns to one ready thread.",
+      "Verify the second turn observes the first turn's session context.",
+      "Verify the Pi session file remains in the mapped VM filesystem."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "private-runner-ndjson-transport",
+    "priority": 1,
+    "phase": "phase-4-streaming-event-bridge",
+    "category": "integration",
+    "description": "The in-VM runner exposes authenticated normalized NDJSON events to the Convex control plane.",
+    "acceptanceSteps": [
+      "Run a runner contract test that emits lifecycle, text, tool, and terminal NDJSON events.",
+      "Verify Convex validates and persists the events in order.",
+      "Verify an unauthenticated runner request is rejected."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "per-thread-runner-secret",
+    "priority": 1,
+    "phase": "phase-4-streaming-event-bridge",
+    "category": "security",
+    "description": "Runner authentication uses dynamically generated per-thread tokens that are not client-readable.",
+    "acceptanceSteps": [
+      "Provision two threads and inspect their secret references without logging token values.",
+      "Verify the references differ and no token is returned by a public Convex query.",
+      "Verify browser build output contains no Daytona, provider, search, or runner credential."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "progressive-assistant-text",
+    "priority": 1,
+    "phase": "phase-4-streaming-event-bridge",
+    "category": "functional",
+    "description": "Assistant text is visible progressively before a turn completes and partial text remains visible after a failure.",
+    "acceptanceSteps": [
+      "Submit a turn that emits more than one text delta.",
+      "Observe at least one persisted partial message update before the terminal run event.",
+      "Force a terminal error after text and verify the partial assistant message is retained."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "progressive-tool-events",
+    "priority": 2,
+    "phase": "phase-4-streaming-event-bridge",
+    "category": "observability",
+    "description": "Tool execution progress is progressively exposed as normalized ordered events.",
+    "acceptanceSteps": [
+      "Run a turn that invokes a tool with progress or output chunks.",
+      "Verify a pending/running record appears before its terminal status.",
+      "Verify the terminal record includes bounded structured output or error details."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "tool-bash",
+    "priority": 1,
+    "phase": "phase-5-required-tools",
+    "category": "functional",
+    "description": "Pi exposes the exact bash tool inside its Daytona VM.",
+    "acceptanceSteps": [
+      "Prompt Pi to invoke bash in the mapped VM.",
+      "Verify a structured bash execution record and bounded output are persisted."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "tool-read-write-edit-grep",
+    "priority": 1,
+    "phase": "phase-5-required-tools",
+    "category": "functional",
+    "description": "Pi exposes the exact read, write, edit, and grep tools inside its Daytona VM.",
+    "acceptanceSteps": [
+      "Prompt Pi to write a file, read it, edit it, and grep the resulting content in the mapped VM.",
+      "Verify four ordered structured tool records named write, read, edit, and grep."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "tool-glob",
+    "priority": 1,
+    "phase": "phase-5-required-tools",
+    "category": "functional",
+    "description": "Pi exposes the exact glob tool with real file-pattern matching semantics inside its Daytona VM.",
+    "acceptanceSteps": [
+      "Create matching and non-matching files in the mapped VM.",
+      "Prompt Pi to invoke glob with a documented pattern.",
+      "Verify the structured glob output includes only matching paths."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "tool-webfetch",
+    "priority": 1,
+    "phase": "phase-5-required-tools",
+    "category": "security",
+    "description": "Pi exposes the exact webfetch tool with bounded, structured HTTP/HTTPS retrieval safety controls.",
+    "acceptanceSteps": [
+      "Fetch a permitted public HTTPS document and verify a bounded structured result with content-type handling.",
+      "Verify invalid schemes, a private or link-local address where practical, excessive redirects, and oversized responses are rejected or bounded.",
+      "Verify the execution record is named webfetch."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "tool-websearch",
+    "priority": 1,
+    "phase": "phase-5-required-tools",
+    "category": "integration",
+    "description": "Pi exposes the exact websearch tool through a documented configured provider and returns no fabricated results.",
+    "acceptanceSteps": [
+      "Configure a documented web-search provider such as Tavily.",
+      "Prompt Pi to invoke websearch and verify structured provider-backed results.",
+      "Remove the provider key and verify a structured configuration error rather than static or fabricated search data."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "ordered-tool-observability",
+    "priority": 1,
+    "phase": "phase-6-frontend-observability-and-lifecycle",
+    "category": "observability",
+    "description": "The UI makes each tool's name, input, output, status, execution order, timing, and error state inspectable.",
+    "acceptanceSteps": [
+      "Complete a turn with at least two tool executions.",
+      "Open the observability panel and verify strictly increasing execution order plus start/end timing and status.",
+      "Expand both tool records and verify their input/output or error details are visible."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "thread-lifecycle-ui",
+    "priority": 2,
+    "phase": "phase-6-frontend-observability-and-lifecycle",
+    "category": "functional",
+    "description": "The UI shows provisioning, ready, running, stopped, and error states with VM ID, provisioning duration, time to first token, retry, and composer availability.",
+    "acceptanceSteps": [
+      "Exercise each thread lifecycle state through tests or an integration environment.",
+      "Verify state-specific UI and composer behavior for each state.",
+      "Verify VM ID, provisioning duration, and time-to-first-token values render when available."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "one-active-run-per-thread",
+    "priority": 1,
+    "phase": "phase-6-frontend-observability-and-lifecycle",
+    "category": "architecture",
+    "description": "A thread accepts only one active run at a time while independent threads can run separately.",
+    "acceptanceSteps": [
+      "Start a run on one ready thread.",
+      "Attempt a second distinct request on that thread and verify it is rejected or blocked without a second runner prompt.",
+      "Start a run on a different ready thread and verify it can proceed."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "duplicate-turn-request-protection",
+    "priority": 1,
+    "phase": "phase-7-recovery-performance-and-e2e",
+    "category": "integration",
+    "description": "Duplicate client turn requests are idempotent and do not create duplicate runs or execution side effects.",
+    "acceptanceSteps": [
+      "Send the same submit-message clientRequestId twice.",
+      "Verify one run, one user message, and one runner turn are recorded.",
+      "Verify a new clientRequestId creates a new eligible run after the first completes."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "vm-filesystem-isolation",
+    "priority": 1,
+    "phase": "phase-7-recovery-performance-and-e2e",
+    "category": "security",
+    "description": "A thread's Pi agent cannot access another thread's Daytona VM files.",
+    "acceptanceSteps": [
+      "Create ready threads A and B with different Daytona IDs.",
+      "Use thread A to write a unique sentinel in its VM.",
+      "Use thread B to attempt to read that sentinel and verify it cannot access it."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "vm-stop-resume-persistence",
+    "priority": 1,
+    "phase": "phase-7-recovery-performance-and-e2e",
+    "category": "integration",
+    "description": "Stopping and resuming a mapped Daytona VM retains its filesystem and Pi session state.",
+    "acceptanceSteps": [
+      "Write a VM sentinel and establish Pi session context for a ready thread.",
+      "Stop and resume the mapped Daytona sandbox.",
+      "Verify the same sandbox ID, sentinel, and session context are available after resume."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "provisioning-overhead-measurement",
+    "priority": 1,
+    "phase": "phase-7-recovery-performance-and-e2e",
+    "category": "performance",
+    "description": "Daytona provisioning overhead from the prebuilt snapshot is measured and reported.",
+    "acceptanceSteps": [
+      "Run the documented provisioning benchmark against the configured VM-compatible snapshot for the documented sample size.",
+      "Save raw start-to-ready timing samples with target and snapshot metadata.",
+      "Report summary statistics without claiming results from mocked runs."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "real-daytona-end-to-end",
+    "priority": 1,
+    "phase": "phase-7-recovery-performance-and-e2e",
+    "category": "integration",
+    "description": "A real Daytona-backed browser flow creates a thread, streams a Pi response from its VM, and exposes its execution history.",
+    "acceptanceSteps": [
+      "Run the opt-in real Daytona integration test with configured credentials.",
+      "Run the Playwright end-to-end flow against the integration environment.",
+      "Verify cleanup outcome is recorded for test sandboxes."
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "assessment-delivery-materials",
+    "priority": 2,
+    "phase": "phase-8-readme-and-demo-preparation",
+    "category": "documentation",
+    "description": "The repository supplies consistent architecture documentation, environment guidance, GitHub source handoff, and a cap.so demo plan based on verified behavior.",
+    "acceptanceSteps": [
+      "Review README, architecture, decisions, environment, and test evidence for consistency with the deployed system.",
+      "Verify no document claims an unverified real integration as complete.",
+      "Record a cap.so demo that shows thread creation, streaming, VM mapping, and tool observability."
+    ],
+    "passes": false,
+    "evidence": null
+  }
+]

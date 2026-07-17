@@ -1,0 +1,12 @@
+node_modules/
+.next/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.local
+.env.*.local
+!.env.example
+convex/_generated/
+graphify-out/.graphify_python
+graphify-out/.graphify_manifest.json
