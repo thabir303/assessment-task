@@ -24,8 +24,8 @@
       "Run contract tests for valid text, tool, lifecycle, and error events.",
       "Run contract tests proving malformed or oversized records are rejected."
     ],
-    "passes": false,
-    "evidence": null
+    "passes": true,
+    "evidence": "2026-07-17: Added parseAgentEvent and isAgentEventWithinSizeLimit in packages/contracts/src/agentEvents.validate.ts (exported via packages/contracts/src/index.ts). 15 vitest cases in packages/contracts/src/agentEvents.validate.test.ts cover text_delta/tool_started/tool_updated/tool_finished/run_terminal accept paths and rejection of unknown type, non-object, non-ISO emittedAt, non-numeric sequence, unknown tool name, and invalid status; size-bound tests confirm oversize and exactly-at-limit behavior against maxEventBytes (64 KiB) using TextEncoder. Run npm run typecheck, npm run lint, npm run test (15 passed in @agentic/contracts), npm run build, and npm run check:structure all green; structural validator reports 14 required files and 28 features with 2 passing (this feature and the harness smoke)."
   },
   {
     "id": "convex-thread-lifecycle-schema",
