@@ -1,42 +1,46 @@
-const implementationPhases = [
-  "Convex schema and local frontend shell",
-  "Daytona VM provisioning",
-  "Pi runner inside the VM",
-  "Streaming event bridge and observability"
-];
+"use client";
+
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useQuery } from "convex/react";
+import { useState } from "react";
+import { Composer } from "../features/chat/Composer";
+import { MessageList } from "../features/chat/MessageList";
+import { ToolTimeline } from "../features/observability/ToolTimeline";
+import { ThreadList } from "../features/threads/ThreadList";
 
 export default function HomePage() {
+  const [selectedThreadId, setSelectedThreadId] = useState<Id<"threads"> | null>(null);
+  const thread = useQuery(api.threads.get, selectedThreadId ? { threadId: selectedThreadId } : "skip");
+
   return (
     <main className="shell">
-      <section className="hero" aria-labelledby="page-title">
-        <p className="eyebrow">Agentic Institute assessment</p>
-        <h1 id="page-title">Pi in an isolated Daytona VM</h1>
-        <p className="lede">
-          The architecture harness is ready. Product behavior is intentionally deferred until each verified feature slice is implemented.
-        </p>
-      </section>
+      <ThreadList selectedThreadId={selectedThreadId} onSelect={setSelectedThreadId} />
 
-      <section className="card" aria-labelledby="boundary-title">
-        <h2 id="boundary-title">Non-negotiable boundary</h2>
-        <dl className="boundary-grid">
-          <div>
-            <dt>Control plane</dt>
-            <dd>Next.js and Convex orchestrate, persist projections, and serve the UI.</dd>
-          </div>
-          <div>
-            <dt>Execution plane</dt>
-            <dd>Pi and all tools run inside one dedicated Daytona VM per thread.</dd>
-          </div>
-        </dl>
-      </section>
+      <section className="chat">
+        {selectedThreadId && thread ? (
+          <>
+            <header className="chat-header">
+              <h1>{thread.title}</h1>
+              <p className="chat-meta">
+                state: <strong>{thread.state}</strong>
+                {thread.sandboxId ? ` · sandbox ${thread.sandboxId}` : ""}
+                {thread.provisioningDurationMs !== null ? ` · provisioned in ${thread.provisioningDurationMs}ms` : ""}
+              </p>
+              {thread.lastError ? (
+                <p className="chat-error" role="alert">
+                  {thread.lastError}
+                </p>
+              ) : null}
+            </header>
 
-      <section className="card" aria-labelledby="roadmap-title">
-        <h2 id="roadmap-title">Next implementation slices</h2>
-        <ol className="phase-list">
-          {implementationPhases.map((phase) => (
-            <li key={phase}>{phase}</li>
-          ))}
-        </ol>
+            <MessageList threadId={selectedThreadId} />
+            <Composer threadId={selectedThreadId} threadState={thread.state} />
+            <ToolTimeline threadId={selectedThreadId} />
+          </>
+        ) : (
+          <p className="chat-placeholder">Select or create a conversation to begin.</p>
+        )}
       </section>
     </main>
   );

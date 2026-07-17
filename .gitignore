@@ -9,5 +9,7 @@ test-results/
 .env.*.local
 !.env.example
 convex/_generated/
+packages/contracts/dist/
+sandbox/runner/dist/
 graphify-out/.graphify_python
 graphify-out/.graphify_manifest.json

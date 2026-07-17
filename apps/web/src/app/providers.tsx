@@ -1,9 +1,23 @@
-import type { ReactNode } from "react";
+"use client";
 
-/**
- * Phase 1 will place ConvexProvider and application-level state providers here.
- * Keeping this boundary now prevents the layout from coupling to future clients.
- */
+import { ConvexProvider } from "convex/react";
+import type { ReactNode } from "react";
+import { convexClient } from "../lib/convexClient";
+
 export function Providers({ children }: Readonly<{ children: ReactNode }>) {
-  return children;
+  if (!convexClient) {
+    return (
+      <main className="shell">
+        <section className="card">
+          <h1>Convex is not configured</h1>
+          <p>
+            Set <code>NEXT_PUBLIC_CONVEX_URL</code> (run <code>npx convex dev</code> once) and restart the dev
+            server.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  return <ConvexProvider client={convexClient}>{children}</ConvexProvider>;
 }

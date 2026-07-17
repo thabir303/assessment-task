@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@agentic/contracts": "0.1.0",
-    "@mariozechner/pi-coding-agent": "0.73.1"
+    "@mariozechner/pi-coding-agent": "0.73.1",
+    "glob": "^13.0.1",
+    "typebox": "^1.1.24"
   }
 }

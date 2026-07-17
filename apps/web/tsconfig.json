@@ -5,7 +5,10 @@
     "plugins": [{ "name": "next" }],
     "incremental": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@convex/*": ["../../convex/*"]
+    }
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
