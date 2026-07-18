@@ -14,37 +14,7 @@ and to the runner).
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Browser["Control plane — browser"]
-        UI[Next.js chat UI]
-    end
-
-    subgraph Convex["Control plane — Convex"]
-        Q[Queries: threads / messages / runs / toolExecutions]
-        M[Mutations: create thread, start run]
-        A1["Node action: provisionSandbox"]
-        A2["Node action: consumeRunnerStream"]
-        DB[(Convex tables)]
-    end
-
-    subgraph Daytona["Execution plane — one Daytona Sandbox per thread"]
-        R[Runner: node dist/server.js]
-        Pi[Pi AgentSession]
-        Tools["bash / read / write / edit / grep / glob / webfetch / websearch"]
-    end
-
-    UI <-- reactive subscriptions --> Q
-    UI -- create thread / send message --> M
-    M -- schedules --> A1
-    M -- schedules --> A2
-    A1 -- "daytona.create() + start runner + health check" --> R
-    A2 -- "POST /turn, authenticated NDJSON stream" --> R
-    R --> Pi --> Tools
-    A1 --> DB
-    A2 --> DB
-    Q --> DB
-```
+![Architecture](architecture.png)
 
 **Request flow:**
 1. Browser calls `threads.create` (idempotent on `clientRequestId`) → Convex writes a `threads` row
@@ -91,30 +61,23 @@ All eight required tools are wired into the Pi session with their **exact** requ
 - **websearch** — real Tavily API call; returns a structured error (never fabricated results) if
   `TAVILY_API_KEY` is missing or the provider is unsupported.
 
-**Two real bugs found and fixed during a rigorous, adversarial audit of all 8 tools** (see
-`feature_list.json` for full evidence):
-1. Pi's built-in `grep` shells out to `ripgrep` and downloads it at runtime if missing from PATH —
-   this failed intermittently in a fresh sandbox. Fixed by baking `ripgrep` into the `pi-agent-v1`
-   image via `apt-get` (same no-runtime-install rationale as the snapshot itself, ADR-005).
-2. The custom `glob` tool originally rejected any path outside the sandbox's cwd, inconsistent with
-   every other tool. Fixed by removing that restriction — verified precise afterward (globbing a
-   directory with mixed extensions returned exactly the matching files, none of the others).
+**Two bugs found and fixed** (full evidence in `feature_list.json`): (1) Pi's built-in `grep` shells out
+to `ripgrep` and downloads it at runtime if missing from PATH, which failed intermittently in a fresh
+sandbox — fixed by baking `ripgrep` into the `pi-agent-v1` image via `apt-get`. (2) The custom `glob`
+tool originally rejected any path outside the sandbox's cwd, inconsistent with every other tool — fixed
+by removing that restriction.
 
-> **Known platform limitation (found during live testing, not a code defect):** this Daytona account's
-> sandbox network resets HTTPS connections (`ECONNRESET`) to Cloudflare-fronted hosts specifically.
-> Confirmed with 7+ live diagnostics across 2 independent fresh sandboxes: `example.com` and
-> `api.tavily.com` (both Cloudflare-fronted) consistently fail, while `api.github.com` consistently
-> succeeds — ruled out DNS, IPv4-vs-IPv6, and TLS-version as causes. Practical effect: `webfetch` works
-> correctly against non-Cloudflare hosts (verified live: `https://api.github.com/zen` → real 200
-> response) but currently cannot reach Tavily's API for `websearch` from inside this Daytona account's
-> sandboxes. Both tools retry transient errors and report the real underlying cause either way.
+> **Known platform limitation (not a code defect):** this Daytona account's sandbox network resets
+> HTTPS connections (`ECONNRESET`) to Cloudflare-fronted hosts specifically — confirmed across
+> independent sandboxes (`example.com` and `api.tavily.com` fail, `api.github.com` succeeds; ruled out
+> DNS, IPv4/IPv6, and TLS version as causes). `webfetch` works against non-Cloudflare hosts; `websearch`
+> currently cannot reach Tavily from inside this account's sandboxes. Both tools retry transient errors
+> and surface the real cause either way.
 
-One important, non-obvious API detail: `createAgentSession({ tools: [...] })` treats `tools` as an
+One non-obvious API detail worth knowing: `createAgentSession({ tools: [...] })` treats `tools` as an
 **allowlist** — passing any value enables *only* those named tools, built-in or custom. An earlier
-version of this runner passed `tools: ["read","bash","edit","write","grep"]` (to add `grep` to Pi's
-defaults) and this silently disabled all three custom tools. The fix (`tools: [...toolNames]`, reusing
-the shared 8-name contract constant) was caught by directly inspecting `session.getAllTools()` against
-a real model call, not by type-checking alone.
+version passed a 5-name list to add `grep` to Pi's defaults, which silently disabled all three custom
+tools. Fixed by always passing the full shared 8-name contract constant.
 
 ## Repository layout
 
@@ -130,46 +93,14 @@ feature_list.json           Per-feature acceptance criteria + honestly-recorded 
 
 ## Setup
 
-### 1. Install and configure Convex
+See [`docs/SETUP.md`](docs/SETUP.md) for the full walkthrough (prerequisites, Convex + Daytona
+configuration, building the snapshot, troubleshooting). Quick version once credentials are in hand:
 
 ```sh
-npm install
-npx convex dev   # first run: creates/links a Convex project, writes .env.local
-```
-
-Keep this running (it's a dev-mode watcher that syncs `convex/` on save). It writes `CONVEX_URL` to
-`.env.local` — for Next.js you also need `NEXT_PUBLIC_CONVEX_URL` (same value, `NEXT_PUBLIC_`-prefixed
-vars are the only ones Next.js exposes to the browser) at **both** the repo root and `apps/web/`
-(`apps/web/.env.local` is a symlink to the root file, since `next dev` resolves env files relative to
-its own working directory, not the monorepo root).
-
-### 2. Push secrets into the Convex deployment (never into the browser)
-
-```sh
-npx convex env set DAYTONA_API_KEY <value>
-npx convex env set DAYTONA_API_URL https://app.daytona.io/api
-npx convex env set DAYTONA_TARGET us
-npx convex env set DAYTONA_SNAPSHOT pi-agent-v1
-npx convex env set PI_PROVIDER openai
-npx convex env set PI_MODEL gpt-4o-mini
-npx convex env set OPENAI_API_KEY <value>
-npx convex env set WEB_SEARCH_PROVIDER tavily
-npx convex env set TAVILY_API_KEY <value>
-npx convex env set AGENT_RUNNER_PORT 8787
-npx convex env set AGENT_TURN_TIMEOUT_MS 480000
-```
-
-### 3. Build the `pi-agent-v1` Daytona snapshot (one-time, billable)
-
-```sh
-npm run build --workspace=@agentic/contracts
-npm run build --workspace=@agentic/sandbox-runner
-DAYTONA_API_KEY=<value> DAYTONA_TARGET=us npm run provision:snapshot
-```
-
-### 4. Run
-
-```sh
+./init.sh                 # installs deps, validates config shape, links apps/web/.env.local
+npx convex dev             # keep running; creates/links your Convex project
+# push DAYTONA_*/PI_*/OPENAI_API_KEY/TAVILY_API_KEY via `npx convex env set` (see docs/SETUP.md)
+DAYTONA_API_KEY=<value> DAYTONA_TARGET=us npm run provision:snapshot   # one-time, billable
 npm run dev
 ```
 
@@ -203,47 +134,33 @@ to Daytona actually execute.
 
 ## What's verified vs. what's left
 
-`feature_list.json` is the source of truth: every `passes: true` entry has a dated, specific evidence
-string describing exactly what was tested (and by what method — live browser session, direct script
-call against the deployment, or code-path reasoning where a live test wasn't run). Every `passes: false`
-entry has `evidence: null`.
+`feature_list.json` is the source of truth — every `passes: true` entry has a dated, specific evidence
+string; every `passes: false` entry has `evidence: null`. `docs/PROGRESS.md` has the full session-by-
+session history, including the real bugs found and fixed along the way. Summary:
 
-**Verified end-to-end against a real Daytona account and Convex deployment:** thread creation and its
-idempotency (including a true concurrent race, not just sequential duplicate calls), distinct sandbox
-provisioning per thread from the shared snapshot, Pi running inside the sandbox (not the host), the
-NDJSON streaming bridge, all 8 tools (including a real Tavily `websearch` call), progressive text/tool
-streaming into the reactive UI, per-thread secret isolation, single-active-run enforcement, and
-**cross-thread VM filesystem isolation** (thread A wrote a unique sentinel file; thread B's sandbox
-genuinely could not see it — two independent Daytona sandboxes, not a shared filesystem).
+**Verified end-to-end against a real Daytona account and Convex deployment:** idempotent thread
+creation and turn submission (including true concurrent races), distinct sandbox provisioning per
+thread, Pi running inside the sandbox (hostname matches the recorded `sandboxId`), the NDJSON streaming
+bridge, 7 of 8 required tools (`websearch` fails live — see the Cloudflare limitation above), per-thread
+secret isolation, single-active-run enforcement, cross-thread filesystem isolation, real VM
+**stop/resume** (same sandbox, filesystem, and Pi session across a genuine stop → resume), and **retry**
+after a forced connection failure (falls back to a fresh sandbox when the original is truly gone,
+keeping message history intact). The chat header exposes **Stop VM** / **Resume VM** / **Retry**
+depending on thread state.
 
-**Provisioning performance** (measured with `npm run benchmark:provisioning`, n=3, real Daytona sandboxes,
-target `us`, snapshot `pi-agent-v1`, each cleaned up automatically after measurement):
+**Provisioning performance** (`npm run benchmark:provisioning`, real Daytona sandboxes, target `us`,
+snapshot `pi-agent-v1`, each cleaned up automatically after measurement):
 
 | Metric | min | median | avg | max |
 |---|---|---|---|---|
-| Provisioning overhead (sandbox create → runner healthy) | 4171ms | 4202ms | 4265ms | 4423ms |
-| Time to first streamed event (health-check-passed → first NDJSON line) | 1550ms | 1777ms | 2115ms | 3018ms |
+| Provisioning overhead (sandbox create → runner healthy) | 3190ms | 3853ms | 3522ms | 3853ms |
+| Time to first streamed event (health-check-passed → first NDJSON line) | 1408ms | 1762ms | 1585ms | 1762ms |
 
-**A real bug found and fixed during verification:** sandboxes are created `ephemeral: true`, which
-Daytona's SDK documents as implicitly setting `autoDeleteInterval: 0` — meaning once a sandbox
-auto-stops after `autoStopInterval` (30 min) of inactivity, it is deleted immediately, not just paused.
-The original `consumeRunnerStream` action swallowed this into the `runs` row only, leaving the *thread*
-silently back in `ready` with a now-dead `sandboxId` reference and no visible error — the composer would
-just accept a new message that would then also silently fail. Fixed by transitioning the thread to
-`error` with a clear, actionable `lastError` message whenever the runner is unreachable (transport-level
-failure), while still letting the thread return to `ready` after an ordinary in-turn failure (a bad LLM
-response, a tool error) that doesn't indicate the sandbox itself is gone.
-
-**Not yet done:** stop/resume reconciliation has no UI action yet (an idle-too-long thread currently
-needs a brand new conversation, not a "resume" affordance); and there is no automated
-Playwright/`test:daytona` suite — all verification above was live/scripted against the real deployment,
-not mocked.
+**Not yet done:** no automated Playwright/`test:daytona` suite — all verification above was
+live/scripted against the real deployment, not mocked; the UI does not render time-to-first-token per
+turn (only `provisioningDurationMs` is shown).
 
 ## Non-goals (per the assessment)
 
 No authentication, no UI/UX polish beyond a functional minimal shell, no tools beyond the required 8,
 no production hardening (rate limiting, multi-region, secret rotation, etc.).
-
-## Demo
-
-See [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) for the cap.so recording script.

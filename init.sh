@@ -52,6 +52,14 @@ else
   printf 'No local environment file found. The static shell can run; copy .env.example to .env.local before Convex or external integration work.\n'
 fi
 
+# `next dev` (run from apps/web) only reads env files relative to its own working directory, not
+# the monorepo root, so apps/web needs its own .env.local. Once `npx convex dev` has written the
+# root .env.local, a symlink keeps the two from drifting out of sync -- safe to re-run any time.
+if [ -f .env.local ] && [ ! -e apps/web/.env.local ]; then
+  ln -s ../../.env.local apps/web/.env.local
+  printf 'Linked apps/web/.env.local -> ../../.env.local.\n'
+fi
+
 npm run check:structure
 
 printf '\nBaseline smoke check passed.\n'

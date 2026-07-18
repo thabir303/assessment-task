@@ -95,7 +95,11 @@ async function main(): Promise<void> {
         apiKey: process.env.TAVILY_API_KEY
       })
     ],
-    sessionManager: SessionManager.create(cwd)
+    // continueRecent loads the most recent session file for this cwd if one exists (surviving a
+    // stop/resume of the sandbox, since the runner process itself always restarts fresh), and
+    // falls back to a brand-new session when none exists yet -- SessionManager.create() would
+    // always start empty even when a prior session file is sitting right there on disk.
+    sessionManager: SessionManager.continueRecent(cwd)
   });
 
   let activeRunId: string | undefined;

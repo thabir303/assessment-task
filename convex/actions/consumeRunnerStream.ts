@@ -24,6 +24,7 @@ export const run = internalAction({
     let terminalStatus: "completed" | "failed" | "cancelled" | "timed_out" = "failed";
     let terminalError: string | undefined = "stream ended before a run_terminal event was received";
     let transportFailed = false;
+    let receivedTerminalEvent = false;
 
     const handleLine = async (line: string) => {
       if (line.trim().length === 0) return;
@@ -73,6 +74,7 @@ export const run = internalAction({
           });
           break;
         case "run_terminal":
+          receivedTerminalEvent = true;
           terminalStatus = event.status;
           terminalError = event.error ?? undefined;
           break;
@@ -119,13 +121,21 @@ export const run = internalAction({
       transportFailed = true;
     }
 
+    if (!receivedTerminalEvent) {
+      // The HTTP stream can end (`done: true`) without ever throwing even when the sandbox was
+      // destroyed mid-turn -- a clean-looking EOF is not proof the turn actually finished. Treat
+      // "no run_terminal event ever arrived" the same as a thrown transport error either way, so
+      // this can't silently revert the thread to "ready" with a now-dead sandbox reference.
+      transportFailed = true;
+    }
+
     if (transportFailed) {
       // The runner itself was unreachable (e.g. the sandbox stopped/was deleted while idle),
       // not just a failed turn -- surface this as a thread-level error instead of silently
       // reverting to "ready" with a now-dead sandbox reference.
       await ctx.runMutation(internal.internal.mutations.markThreadError, {
         threadId,
-        message: `Lost connection to the sandbox: ${terminalError}. Start a new conversation to get a fresh sandbox.`
+        message: `Lost connection to the sandbox: ${terminalError}. Click Retry to reconnect or provision a fresh sandbox for this conversation.`
       });
     }
 

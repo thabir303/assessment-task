@@ -49,6 +49,18 @@ export const markThreadError = internalMutation({
   }
 });
 
+export const updateSandboxConnection = internalMutation({
+  args: { threadId: v.id("threads"), previewUrl: v.string(), previewToken: v.string() },
+  handler: async (ctx, { threadId, previewUrl, previewToken }) => {
+    const existing = await ctx.db
+      .query("sandboxSessions")
+      .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+      .unique();
+    if (!existing) return;
+    await ctx.db.patch(existing._id, { previewUrl, previewToken });
+  }
+});
+
 export const appendAssistantDelta = internalMutation({
   args: { threadId: v.id("threads"), runId: v.string(), delta: v.string() },
   handler: async (ctx, { threadId, runId, delta }) => {

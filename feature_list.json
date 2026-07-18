@@ -179,7 +179,7 @@
       "Force a terminal error after text and verify the partial assistant message is retained."
     ],
     "passes": true,
-    "evidence": "2026-07-17/18: appendAssistantDelta patches the message row on every single text_delta event (dozens observed per turn in real tests), and Convex's reactive useQuery re-renders the browser on each patch -- live-verified, assistant replies visibly stream token-by-token in the UI. Partial-text-survives-failure was not separately forced/tested this session; the code path (message row is written incrementally regardless of eventual run_terminal status) supports it by construction but this specific failure scenario is unverified."
+    "evidence": "2026-07-18: appendAssistantDelta patches the message row on every single text_delta event (dozens observed per turn in real tests), and Convex's reactive useQuery re-renders the browser on each patch -- live-verified, assistant replies visibly stream token-by-token in the UI. Partial-text-survives-failure independently forced and confirmed against a real deployed sandbox: polled messages:list until a partial assistant message appeared mid-stream, then deleted that thread's real Daytona sandbox out from under the in-flight turn. The final assistant message retained the exact partial prose generated before the connection died (verified byte-for-byte, ending mid-sentence with no trailing punctuation), isPartial correctly flips to false on finalize, and the thread transitioned to state 'error' with a clear lastError -- not silently 'ready'. This exercise also caught and fixed a real bug: when the runner's HTTP stream ended cleanly (done:true) without ever emitting a run_terminal event -- which is exactly what happens when the sandbox dies mid-turn without the fetch throwing -- convex/actions/consumeRunnerStream.ts previously treated it as a plain failed run and let the thread revert to 'ready' with a dead sandboxId. Fixed by tracking receivedTerminalEvent and treating its absence the same as a thrown transport error; re-ran the identical kill against a fresh sandbox afterward and confirmed the thread now correctly ends in 'error' with the exact preserved partial text."
   },
   {
     "id": "progressive-tool-events",
@@ -260,8 +260,8 @@
       "Prompt Pi to invoke websearch and verify structured provider-backed results.",
       "Remove the provider key and verify a structured configuration error rather than static or fabricated search data."
     ],
-    "passes": true,
-    "evidence": "2026-07-18: Tool logic directly verified correct: invoked createWebSearchToolDefinition's execute() with a real TAVILY_API_KEY and query 'Daytona sandbox isolated compute' outside the affected network path -- received genuine Tavily results (real article titles/URLs/content), not fabricated; re-invoked with apiKey: undefined and confirmed it throws 'TAVILY_API_KEY is not configured for this sandbox' rather than inventing data. IMPORTANT CAVEAT: live in a real deployed Daytona sandbox, the same call fails with a network-level ECONNRESET reaching api.tavily.com (Tavily's API is Cloudflare-fronted, and this Daytona account's sandbox network resets connections to Cloudflare specifically -- see tool-webfetch evidence for the full diagnostic). The tool now retries transient errors and surfaces the real cause ('network request failed: fetch failed (ECONNRESET: read ECONNRESET)') instead of a bare 'fetch failed', but cannot currently reach Tavily from inside this Daytona account's sandboxes. This is a platform network limitation outside this codebase's control, not a code defect -- marked passing on tool-correctness grounds, with this limitation documented prominently in README.md."
+    "passes": false,
+    "evidence": null
   },
   {
     "id": "ordered-tool-observability",
@@ -344,8 +344,8 @@
       "Stop and resume the mapped Daytona sandbox.",
       "Verify the same sandbox ID, sentinel, and session context are available after resume."
     ],
-    "passes": false,
-    "evidence": null
+    "passes": true,
+    "evidence": "2026-07-18: Root cause of the prior failure found and fixed: convex/actions/provisionSandbox.ts created sandboxes with ephemeral:true, which the Daytona SDK's own type docs say forces autoDeleteInterval to 0 -- 'delete immediately upon stopping' -- making a stopped sandbox undeletable-but-resumable state architecturally unreachable. Fixed by dropping ephemeral:true and setting an explicit, bounded autoDeleteInterval (1440 min) so a stop no longer deletes the sandbox. Separately, sandbox/runner/src/server.ts used SessionManager.create(cwd), which always starts a brand-new empty Pi session even when a prior session file for that cwd exists on disk; fixed to SessionManager.continueRecent(cwd), which loads the most recent session file for that cwd if present and falls back to a fresh one otherwise. Added convex/threads.ts stop/resume mutations, convex/actions/stopSandbox.ts, and convex/actions/resumeSandbox.ts (restarts the runner in the same sandbox via Daytona's process API, always re-fetching the preview link/token rather than trusting the pre-stop values). Live-verified end-to-end against a real Daytona account: created a thread, wrote a sentinel file to /tmp and told Pi a secret codeword, called the new stop mutation -- confirmed via a direct Daytona SDK query that the sandbox state was 'stopped', not deleted. Called the new resume mutation -- thread returned to 'ready' with the identical sandboxId in ~4s, and a follow-up turn correctly recalled the secret codeword (proving genuine Pi session continuation via continueRecent, not a fresh session) and read back the exact sentinel file content. Also verified the fallback path: killed a sandbox out from under an active thread, confirmed the resume mutation detects it's gone and reprovisions an entirely new sandbox (different sandboxId, fresh provisioningDurationMs) rather than erroring, and the thread's Convex message history remained intact across that reprovision."
   },
   {
     "id": "provisioning-overhead-measurement",

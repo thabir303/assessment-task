@@ -13,3 +13,4 @@ packages/contracts/dist/
 sandbox/runner/dist/
 graphify-out/.graphify_python
 graphify-out/.graphify_manifest.json
+docs/DEMO_SCRIPT.md

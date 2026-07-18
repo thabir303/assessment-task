@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
+import { assertTransition } from "./lib/lifecycle";
 
 export const list = query({
   args: {},
@@ -68,5 +69,37 @@ export const create = mutation({
 
     await ctx.scheduler.runAfter(0, internal.actions.provisionSandbox.run, { threadId });
     return { threadId };
+  }
+});
+
+/** Deliberately stops the thread's mapped Daytona sandbox. Only valid from `ready`. */
+export const stop = mutation({
+  args: { threadId: v.id("threads") },
+  handler: async (ctx, { threadId }) => {
+    const thread = await ctx.db.get(threadId);
+    if (!thread) throw new Error("thread not found");
+    assertTransition(thread.state, "stopped");
+
+    await ctx.db.patch(threadId, { state: "stopped", updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.actions.stopSandbox.run, { threadId });
+  }
+});
+
+/**
+ * Resumes a `stopped` thread (restarts the runner in the same sandbox, preserving its filesystem
+ * and Pi session) or retries a `error` thread (reconnects if the sandbox is still reachable,
+ * otherwise falls back to provisioning a fresh one). Both source states share one Convex
+ * transition -- `provisioning` -- because from the browser's point of view both are "the
+ * connection to the VM is being (re)established."
+ */
+export const resume = mutation({
+  args: { threadId: v.id("threads") },
+  handler: async (ctx, { threadId }) => {
+    const thread = await ctx.db.get(threadId);
+    if (!thread) throw new Error("thread not found");
+    assertTransition(thread.state, "provisioning");
+
+    await ctx.db.patch(threadId, { state: "provisioning", lastError: undefined, updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.actions.resumeSandbox.run, { threadId });
   }
 });

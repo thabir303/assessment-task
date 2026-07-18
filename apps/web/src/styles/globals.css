@@ -127,6 +127,22 @@ p {
   font-size: 0.875rem;
 }
 
+.vm-control {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid #dfe3eb;
+  border-radius: 999px;
+  background: white;
+  color: #4f46e5;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vm-control:hover {
+  background: #eef2ff;
+}
+
 .chat-placeholder {
   color: #6b7280;
 }
