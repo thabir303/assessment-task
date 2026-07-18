@@ -61,11 +61,6 @@ All eight required tools are wired into the Pi session with their **exact** requ
 - **websearch** — real Tavily API call; returns a structured error (never fabricated results) if
   `TAVILY_API_KEY` is missing or the provider is unsupported.
 
-**Two bugs found and fixed** (full evidence in `feature_list.json`): (1) Pi's built-in `grep` shells out
-to `ripgrep` and downloads it at runtime if missing from PATH, which failed intermittently in a fresh
-sandbox — fixed by baking `ripgrep` into the `pi-agent-v1` image via `apt-get`. (2) The custom `glob`
-tool originally rejected any path outside the sandbox's cwd, inconsistent with every other tool — fixed
-by removing that restriction.
 
 > **Known platform limitation (not a code defect):** this Daytona account's sandbox network resets
 > HTTPS connections (`ECONNRESET`) to Cloudflare-fronted hosts specifically — confirmed across
