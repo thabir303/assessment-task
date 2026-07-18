@@ -156,10 +156,6 @@ snapshot `pi-agent-v1`, each cleaned up automatically after measurement):
 | Provisioning overhead (sandbox create → runner healthy) | 3190ms | 3853ms | 3522ms | 3853ms |
 | Time to first streamed event (health-check-passed → first NDJSON line) | 1408ms | 1762ms | 1585ms | 1762ms |
 
-**Not yet done:** no automated Playwright/`test:daytona` suite — all verification above was
-live/scripted against the real deployment, not mocked; the UI does not render time-to-first-token per
-turn (only `provisioningDurationMs` is shown).
-
 ## Non-goals (per the assessment)
 
 No authentication, no UI/UX polish beyond a functional minimal shell, no tools beyond the required 8,
