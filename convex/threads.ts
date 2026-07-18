@@ -91,15 +91,23 @@ export const stop = mutation({
  * otherwise falls back to provisioning a fresh one). Both source states share one Convex
  * transition -- `provisioning` -- because from the browser's point of view both are "the
  * connection to the VM is being (re)established."
+ *
+ * If the thread is already `provisioning` (e.g. the user double-clicked Resume, or two tabs
+ * raced), this mutation is a no-op: it neither re-schedules `resumeSandbox` nor touches the
+ * row. The earlier scheduled action is still in flight and will resolve the state itself.
  */
 export const resume = mutation({
   args: { threadId: v.id("threads") },
   handler: async (ctx, { threadId }) => {
     const thread = await ctx.db.get(threadId);
     if (!thread) throw new Error("thread not found");
-    assertTransition(thread.state, "provisioning");
 
+    // Idempotent no-op: a previous resume call already kicked off the action.
+    if (thread.state === "provisioning") return { threadId, alreadyProvisioning: true };
+
+    assertTransition(thread.state, "provisioning");
     await ctx.db.patch(threadId, { state: "provisioning", lastError: undefined, updatedAt: Date.now() });
     await ctx.scheduler.runAfter(0, internal.actions.resumeSandbox.run, { threadId });
+    return { threadId, alreadyProvisioning: false };
   }
 });
